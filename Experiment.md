@@ -1,302 +1,301 @@
+# MELD Experiment Reproduction Guide
 
-# MELD 实验复现操作手册
+## Step 1: Environment Setup
 
-## 第一步：环境安装
-
-### 1. 安装 uv（如果还没安装）
+### 1. Install uv (if not already installed)
 
 ```bash
-# 使用 curl 安装（推荐）
+# Install using curl (recommended)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 或者使用 pip 安装
+# Or install using pip
 pip install uv
 
-# 或者使用 homebrew（macOS）
+# Or install using homebrew (macOS)
 brew install uv
 ```
 
-### 2. 同步依赖
+### 2. Sync dependencies
 
 ```bash
-# 同步依赖
+# Sync dependencies
 uv sync
 ```
 
-### 3. 验证环境
+### 3. Verify environment
 
 ```bash
-# 验证核心依赖
+# Verify core dependencies
 uv run python -c "
 import torch, transformers, sklearn, pandas, numpy
-print('✅ 环境配置成功')
+print('✅ Environment setup successful')
 print(f'PyTorch: {torch.__version__}')
 print(f'CUDA: {torch.cuda.is_available()}')
 "
 ```
 
-## 第二步：模型准备
+## Step 2: Model Preparation
 
-### 1. 下载 Qwen 模型
+### 1. Download Qwen model
 
 ```bash
-# 下载 Qwen3-0.6B 模型
+# Download Qwen3-0.6B model
 uv run python scripts/download_models.py
 ```
 
-### 2. 验证模型路径
+### 2. Verify model path
 
 ```bash
-# 检查模型是否下载成功
+# Check if model downloaded successfully
 ls -la models/
 ```
 
-## 第三步：数据准备
+## Step 3: Data Preparation
 
-### 1. 准备输入数据
+### 1. Prepare input data
 
-将 CAPE JSON 数据放入指定目录：
+Place CAPE JSON data in specified directories:
 ```bash
-# 恶意样本（按家族分组）
+# Malicious samples (grouped by family)
+mkdir -p input/cape_behavior_malicious_train
+
+# Benign samples (flat structure)
 mkdir -p input/cape_behavior_benign_train
 
-# 良性样本（平铺）
-mkdir -p input/cape_behavior_benign_train
-
-# 从数据集仓库下载数据集
-# 必要文件：malicious_dataset_manifest.csv
-# 必要文件：cape_reports.7z.* -> cape_reports
+# Download dataset from dataset repository
+# Required files: malicious_dataset_manifest.csv
+# Required files: cape_reports.7z.* -> cape_reports
 uv run python scripts/copy_correct_cape_samples.py --manifest malicious_dataset_manifest.csv  --source-malicious cape_reports --source-benign cape_reports --target-malicious input/cape_behavior_malicious_train --target-benign input/cape_behavior_benign_train
 ```
 
-### 2. 数据转换
+### 2. Data conversion
 
 ```bash
-# 转换恶意样本到 Markdown
+# Convert malicious samples to Markdown
 uv run python scripts/batch_convert_cape_data.py \
   --input input/cape_behavior_malicious_train \
   --output data/processed/cape_reports_malicious_md \
   --workers 4
 
-# 转换良性样本到 Markdown
+# Convert benign samples to Markdown
 uv run python scripts/batch_convert_cape_data.py \
   --input input/cape_behavior_benign_train \
   --output data/processed/cape_reports_benign_md \
   --workers 4
 ```
 
-### 3. 数据预处理
+### 3. Data preprocessing
 
 ```bash
-# 生成数据集索引
+# Generate dataset index
 uv run python scripts/preprocess_data.py \
   --input data/processed \
   --output data/processed
 
-# 验证数据预处理结果
+# Verify data preprocessing results
 ls -la data/processed/
 cat data/processed/dataset_stats.json
 ```
 
-## 第四步：系统验证
+## Step 4: System Verification
 
-**目的**：验证MELD核心功能是否正常，为后续正式实验做准备
+**Purpose**: Verify that MELD core functionality works properly before running formal experiments
 
-### 使用验证脚本（推荐）
+### Use verification script (recommended)
 
 ```bash
-# 运行MELD系统验证脚本
+# Run MELD system verification script
 ./scripts/verify_meld_system.sh
 ```
 
-这个脚本会自动完成以下验证步骤：
-1. **环境验证** - 检查Python版本和所有依赖包
-2. **模型路径检查** - 验证Qwen模型是否可用
-3. **数据完整性检查** - 检查输入数据和处理后的数据
-4. **MELD功能验证** - 测试特征提取和分类功能
-5. **生成验证报告** - 创建详细的验证报告
+This script will automatically complete the following verification steps:
+1. **Environment verification** - Check Python version and all dependency packages
+2. **Model path check** - Verify Qwen model availability
+3. **Data integrity check** - Check input data and processed data
+4. **MELD functionality verification** - Test feature extraction and classification functions
+5. **Generate verification report** - Create detailed verification report
 
-### 查看验证结果
+### View verification results
 
 ```bash
-# 查看验证报告
+# View verification report
 cat results/meld_system_verification_report.md
 
-# 查看详细的JSON结果
+# View detailed JSON results
 cat results/meld_verification.json
 
-# 检查所有结果文件
+# Check all result files
 ls -la results/
 ```
 
 
-## 第五步：实验执行
+## Step 5: Experiment Execution
 
-### 1. Time-OOD 实验
+### 1. Time-OOD Experiment
 
 ```bash
-# 运行时间分布外检测实验
+# Run temporal out-of-distribution detection experiment
 uv run python experiments/time_ood/run_time_ood.py \
   --data_dir data/processed \
   --model_dir models/qwen3-0.6b \
   --output results/time_ood_results.json
 ```
 
-### 2. Family-OOD 实验
+### 2. Family-OOD Experiment
 
-#### 单个家族实验
+#### Single family experiment
 
 ```bash
-# 运行家族分布外检测实验（以 AgentTesla 为例）
+# Run family out-of-distribution detection experiment (using AgentTesla as example)
 uv run python experiments/family_ood/run_family_ood.py \
   --target_family AgentTesla \
   --data_dir data/processed \
   --model_dir models/qwen3-0.6b
 
-# 快速测试：使用小样本量（推荐用于初次验证）
+# Quick test: use small sample size (recommended for initial verification)
 uv run python experiments/family_ood/run_family_ood.py \
   --target_family AgentTesla \
   --max_samples 100
 
-# 精细控制样本数量
+# Fine-grained sample control
 uv run python experiments/family_ood/run_family_ood.py \
   --target_family AsyncRAT \
   --max_train_samples 500 \
   --max_val_samples 50 \
   --max_test_samples 200
 
-# 跳过报告生成
+# Skip report generation
 uv run python experiments/family_ood/run_family_ood.py \
   --target_family Formbook \
   --max_samples 100 \
   --no-report
 ```
 
-#### 批量实验（推荐）
+#### Batch experiments (recommended)
 
 ```bash
-# 运行所有 Top-8 家族的批量实验（自动生成汇总报告）
+# Run batch experiments for all Top-8 families (auto-generate summary report)
 uv run python experiments/family_ood/run_family_ood.py \
   --batch \
   --data_dir data/processed \
   --model_dir models/qwen3-0.6b
 
-# 批量快速测试（带样本限制，推荐用于资源有限环境）
+# Batch quick test (with sample limits, recommended for resource-limited environments)
 uv run python experiments/family_ood/run_family_ood.py \
   --batch \
   --max_samples 200
 
-# 批量实验跳过报告生成
+# Batch experiments skip report generation
 uv run python experiments/family_ood/run_family_ood.py \
   --batch \
   --max_samples 100 \
   --no-report
 
-# 自定义批量汇总报告路径
+# Custom batch summary report path
 uv run python experiments/family_ood/run_family_ood.py \
   --batch \
   --max_samples 300 \
   --batch_report results/custom_family_summary.md
 ```
 
-**参数说明：**
+**Parameter descriptions:**
 
-**样本限制参数：**
-- `--max_samples N`: 设置所有样本限制为N（便捷参数）
-- `--max_train_samples N`: 最大训练样本数
-- `--max_val_samples N`: 最大验证样本数  
-- `--max_test_samples N`: 最大测试样本数
-- 不指定限制参数时使用所有可用样本
+**Sample limit parameters:**
+- `--max_samples N`: Set all sample limits to N (convenience parameter)
+- `--max_train_samples N`: Maximum training samples
+- `--max_val_samples N`: Maximum validation samples  
+- `--max_test_samples N`: Maximum test samples
+- Use all available samples when no limit parameters are specified
 
-**报告生成参数：**
-- `--report FILE`: 指定单个实验报告文件路径（自动生成如不指定）
-- `--no-report`: 跳过报告生成
-- `--batch_report FILE`: 指定批量实验汇总报告路径
+**Report generation parameters:**
+- `--report FILE`: Specify single experiment report file path (auto-generated if not specified)
+- `--no-report`: Skip report generation
+- `--batch_report FILE`: Specify batch experiment summary report path
 
-**批量实验参数：**
-- `--batch`: 运行所有8个家族的批量实验
-- 批量模式会自动生成每个家族的个人报告 + 一个汇总对比报告
+**Batch experiment parameters:**
+- `--batch`: Run batch experiments for all 8 families
+- Batch mode automatically generates individual reports for each family + one summary comparison report
 
-**实验输出：**
-- **JSON结果**: `results/family_ood/meld_family_ood_{family}.json`
-- **个人报告**: `results/family_ood/family_ood_{family}_report.md`
-- **汇总报告**: `results/family_ood/family_ood_summary_report.md`
+**Experiment outputs:**
+- **JSON results**: `results/family_ood/meld_family_ood_{family}.json`
+- **Individual reports**: `results/family_ood/family_ood_{family}_report.md`
+- **Summary report**: `results/family_ood/family_ood_summary_report.md`
 
 
-## 第六步：结果分析
+## Step 6: Results Analysis
 
-### 1. Time-OOD 实验结果分析
+### 1. Time-OOD experiment results analysis
 
 ```bash
-# 查看 Time-OOD JSON 结果
+# View Time-OOD JSON results
 cat results/time_ood_results.json
 
-# 查看 Time-OOD Markdown 报告（自动生成）
+# View Time-OOD Markdown report (auto-generated)
 cat results/time_ood/time_ood_report.md
 
-# 查看详细的 JSON 结果文件
+# View detailed JSON result files
 ls results/time_ood/
 ```
 
-**Time-OOD 结果解读：**
-- **Macro F1-Score**：整体分类性能
-- **AUROC**：ROC曲线下面积，衡量分类器区分能力
-- **AUPR**：PR曲线下面积，适用于不平衡数据
-- **最优阈值**：用于二分类的决策阈值
+**Time-OOD results interpretation:**
+- **Macro F1-Score**: Overall classification performance
+- **AUROC**: Area under ROC curve, measures classifier discrimination ability
+- **AUPR**: Area under PR curve, suitable for imbalanced data
+- **Optimal threshold**: Decision threshold for binary classification
 
-### 2. Family-OOD 实验结果分析
+### 2. Family-OOD experiment results analysis
 
 ```bash
-# 查看所有家族的实验结果
+# View all family experiment results
 ls results/family_ood/
 
-# 查看汇总报告（推荐）
+# View summary report (recommended)
 cat results/family_ood/family_ood_summary_report.md
 
-# 查看单个家族的详细报告
+# View individual family detailed reports
 cat results/family_ood/family_ood_agenttesla_report.md
 cat results/family_ood/family_ood_asyncrat_report.md
-# ... 其他家族
+# ... other families
 
-# 查看原始 JSON 结果
+# View raw JSON results
 cat results/family_ood/meld_family_ood_agenttesla.json
 ```
 
-**Family-OOD 结果解读：**
-- **每个家族作为 OOD**：测试模型对未见过家族的泛化能力
-- **性能对比**：不同家族的检测难度差异
-- **汇总统计**：所有家族的平均性能
+**Family-OOD results interpretation:**
+- **Each family as OOD**: Test model's generalization ability to unseen families
+- **Performance comparison**: Detection difficulty differences across families
+- **Summary statistics**: Average performance across all families
 
 
-## 第七步：高级实验
+## Step 7: Advanced Experiments
 
-### 1. 层级分析实验
+### 1. Layer analysis experiments
 
 ```bash
-# 测试不同层的特征效果
+# Test feature effects of different layers
 python scripts/test_mistral_all_layers.py
 
-# 无随机化的层级测试
+# Layer testing without randomization
 python scripts/test_mistral_all_layers_norandom.py
 ```
 
-### 2. 批量层级评估
+### 2. Batch layer evaluation
 
 ```bash
-# 运行 Layer 15 实验
+# Run Layer 15 experiment
 ./scripts/run_rq2_layer15.sh
 
-# 运行 Layer 28 实验
+# Run Layer 28 experiment
 ./scripts/run_rq2_layer28.sh
 ```
 
-### 3. OOD 评估实验
+### 3. OOD evaluation experiments
 
 ```bash
-# 安装
+# Install
 uv pip install -e .
 
-# 运行 OOD 评估
+# Run OOD evaluation
 uv run python src/meld/ood_eval.py \
   --index_csv data/processed/dataset_with_family_time.csv \
   --model_dir models/qwen3-0.6b \
