@@ -1,0 +1,21 @@
+[project]
+name = "meld"
+version = "0.1.0"
+description = "MELD: LLM-based Unknown Malware Detection with Layered Evidence"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "duckdb>=0.9.0",
+    "joblib>=1.2.0",
+    "numpy>=1.23.0",
+    "pandas>=2.0.0",
+    "psutil>=5.9.0",
+    "scikit-learn>=1.3.0",
+    "scipy>=1.9.0",
+    "sentencepiece>=0.1.99",
+    "tokenizers>=0.13.0",
+    "torch>=2.0.0,<3.0.0",
+    "tqdm>=4.64.0",
+    "transformers>=4.40.0,<5.0.0",
+    "typing-extensions>=4.0.0",
+]
